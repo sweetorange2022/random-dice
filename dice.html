@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>骰子 · Random Dice</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --face-bg-1: #ffffff;
+    --face-bg-2: #e8ecf5;
+    --pip: #1c2230;
+    --pip-red: #e2384b;
+    --accent: #4d8dff;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(circle at 50% 15%, #2b3550 0%, #151a26 45%, #0b0e14 100%);
+    color: #e9edf6;
+    user-select: none;
+    overflow: hidden;
+  }
+
+  /* 顶部标题 */
+  .title {
+    font-size: 15px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: #7c88a3;
+    font-weight: 500;
+  }
+
+  /* 3D 场景 */
+  .scene {
+    width: 180px;
+    height: 180px;
+    perspective: 1100px;
+    position: relative;
+  }
+
+  /* 阴影 */
+  .shadow {
+    position: absolute;
+    left: 50%;
+    bottom: -46px;
+    width: 150px;
+    height: 22px;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse at center, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 72%);
+    filter: blur(3px);
+    transition: opacity .3s, transform .3s;
+  }
+
+  /* 整体姿态倾斜，让立方体有立体感 */
+  .tilt {
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transform: rotateX(-12deg) rotateY(-18deg);
+  }
+
+  .cube {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  .face {
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    background: linear-gradient(150deg, var(--face-bg-1) 0%, var(--face-bg-2) 100%);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.85),
+                inset 0 -14px 26px rgba(120,135,165,.28),
+                inset 0 12px 22px rgba(255,255,255,.9);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    padding: 18px;
+    gap: 4px;
+    backface-visibility: hidden;
+  }
+
+  .pip {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 32% 28%, #4a5568 0%, var(--pip) 62%, #0c1018 100%);
+    box-shadow: inset 0 2px 3px rgba(0,0,0,.55), 0 1px 1px rgba(255,255,255,.65);
+    transform: scale(0);
+    transition: transform .18s ease;
+  }
+  .pip.on { transform: scale(1); }
+  .face[data-num="1"] .pip.on {
+    background: radial-gradient(circle at 32% 28%, #ff7b86 0%, var(--pip-red) 62%, #8e1424 100%);
+  }
+
+  /* 六个面 */
+  .f-front  { transform: translateZ(90px); }
+  .f-back   { transform: rotateY(180deg) translateZ(90px); }
+  .f-right  { transform: rotateY(90deg)  translateZ(90px); }
+  .f-left   { transform: rotateY(-90deg) translateZ(90px); }
+  .f-top    { transform: rotateX(90deg)  translateZ(90px); }
+  .f-bottom { transform: rotateX(-90deg) translateZ(90px); }
+
+  /* 结果文字 */
+  .result {
+    font-size: 17px;
+    color: #9aa6bf;
+    letter-spacing: 1px;
+    height: 24px;
+    transition: color .25s;
+  }
+  .result .num {
+    display: inline-block;
+    min-width: 28px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    vertical-align: -3px;
+  }
+  .result.live { color: #6f7d99; }
+
+  /* 按钮组 */
+  .controls { display: flex; gap: 18px; }
+
+  button {
+    position: relative;
+    min-width: 118px;
+    padding: 13px 26px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    font-family: inherit;
+    color: #dbe4f5;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: transform .12s ease, background .2s, border-color .2s, box-shadow .2s, color .2s;
+  }
+  button:hover:not(:disabled) {
+    background: rgba(255,255,255,.12);
+    border-color: rgba(255,255,255,.28);
+    transform: translateY(-2px);
+  }
+  button:active:not(:disabled) { transform: translateY(0) scale(.97); }
+
+  #startBtn {
+    background: linear-gradient(135deg, rgba(77,141,255,.28), rgba(77,141,255,.10));
+    border-color: rgba(77,141,255,.55);
+    color: #b9d2ff;
+    box-shadow: 0 0 0 rgba(77,141,255,0);
+  }
+  #startBtn:hover:not(:disabled) {
+    box-shadow: 0 8px 24px rgba(77,141,255,.28), 0 0 0 1px rgba(77,141,255,.35);
+  }
+
+  #pauseBtn {
+    background: linear-gradient(135deg, rgba(255,138,76,.24), rgba(255,138,76,.08));
+    border-color: rgba(255,138,76,.5);
+    color: #ffc8a5;
+  }
+  #pauseBtn:hover:not(:disabled) {
+    box-shadow: 0 8px 24px rgba(255,138,76,.24), 0 0 0 1px rgba(255,138,76,.32);
+  }
+
+  button:disabled {
+    opacity: .32;
+    cursor: not-allowed;
+    filter: grayscale(.55);
+  }
+
+  .hint { font-size: 12px; color: #566078; letter-spacing: 1px; }
+
+  @media (max-height: 620px) {
+    .scene { width: 140px; height: 140px; }
+    .f-front,.f-back,.f-right,.f-left,.f-top,.f-bottom { transform-origin: center; }
+    .f-front  { transform: translateZ(70px); }
+    .f-back   { transform: rotateY(180deg) translateZ(70px); }
+    .f-right  { transform: rotateY(90deg)  translateZ(70px); }
+    .f-left   { transform: rotateY(-90deg) translateZ(70px); }
+    .f-top    { transform: rotateX(90deg)  translateZ(70px); }
+    .f-bottom { transform: rotateX(-90deg) translateZ(70px); }
+  }
+</style>
+</head>
+<body>
+
+  <div class="title">Dice Roller</div>
+
+  <div class="scene">
+    <div class="tilt">
+      <div class="cube" id="cube">
+        <div class="face f-front"  data-num="1"></div>
+        <div class="face f-back"   data-num="2"></div>
+        <div class="face f-right"  data-num="3"></div>
+        <div class="face f-left"   data-num="4"></div>
+        <div class="face f-top"    data-num="5"></div>
+        <div class="face f-bottom" data-num="6"></div>
+      </div>
+    </div>
+    <div class="shadow" id="shadow"></div>
+  </div>
+
+  <div class="result" id="result">点击「开始」投掷骰子</div>
+
+  <div class="controls">
+    <button id="startBtn">开 始</button>
+    <button id="pauseBtn" disabled>暂 停</button>
+  </div>
+
+  <div class="hint">空格键 = 开始 / 暂停</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- 骰子点位布局 ---------- */
+  var PIP_MAP = {
+    1: [5],
+    2: [1, 9],
+    3: [1, 5, 9],
+    4: [1, 3, 7, 9],
+    5: [1, 3, 5, 7, 9],
+    6: [1, 3, 4, 6, 7, 9]
+  };
+
+  // 每个面填充圆点
+  document.querySelectorAll(".face").forEach(function (face) {
+    var n = Number(face.dataset.num);
+    for (var i = 1; i <= 9; i++) {
+      var pip = document.createElement("span");
+      pip.className = "pip" + (PIP_MAP[n].indexOf(i) > -1 ? " on" : "");
+      face.appendChild(pip);
+    }
+  });
+
+  /* ---------- 元素引用 ---------- */
+  var cube     = document.getElementById("cube");
+  var shadow   = document.getElementById("shadow");
+  var resultEl = document.getElementById("result");
+  var startBtn = document.getElementById("startBtn");
+  var pauseBtn = document.getElementById("pauseBtn");
+
+  /* ---------- 姿态与物理参数 ---------- */
+  // 使某个点数朝向观察者所需的 rotateX / rotateY（单位：度）
+  var FACE_ROT = {
+    1: [0, 0],
+    2: [0, 180],
+    3: [0, -90],
+    4: [0, 90],
+    5: [-90, 0],
+    6: [90, 0]
+  };
+
+  var SPIN_MAX   = 26;   // 最大角速度（度 / 帧@60fps）
+  var SPIN_MIN   = 9;    // 最小角速度，保证一直在转
+  var SETTLE_MS  = 950;  // 停下来的减速时长
+
+  var rotX = 0, rotY = 0;      // 当前角度
+  var velX = 0, velY = 0;      // 当前角速度
+  var rolling   = false;       // 是否处于投掷状态
+  var settling  = null;        // 收尾动画状态
+  var rafId     = null;
+  var lastT     = 0;
+  var faceNow   = 1;           // 当前正面点数
+
+  function render() {
+    cube.style.transform = "rotateX(" + rotX.toFixed(2) + "deg) rotateY(" + rotY.toFixed(2) + "deg)";
+  }
+
+  function randVel() {
+    var s = SPIN_MIN + Math.random() * (SPIN_MAX - SPIN_MIN);
+    var sign = Math.random() < 0.5 ? -1 : 1;
+    return s * sign;
+  }
+
+  function pushVel(v) {
+    // 维持一个方向，但保证速度不低于下限
+    if (Math.abs(v) < SPIN_MIN) return (v < 0 ? -1 : 1) * SPIN_MIN;
+    return Math.max(-SPIN_MAX, Math.min(SPIN_MAX, v));
+  }
+
+  /* ---------- 主循环 ---------- */
+  function loop(t) {
+    if (!lastT) lastT = t;
+    var dt = Math.min(48, t - lastT);   // 限幅，防止切标签后跳帧
+    lastT = t;
+    var k = dt / 16.667;                // 相对 60fps 的步长系数
+
+    /* --- 收尾：缓出落到某个点数 --- */
+    if (settling) {
+      var p = Math.min(1, (t - settling.start) / SETTLE_MS);
+      var e = 1 - Math.pow(1 - p, 3);   // easeOutCubic
+      rotX = settling.fx + (settling.tx - settling.fx) * e;
+      rotY = settling.fy + (settling.ty - settling.fy) * e;
+      render();
+
+      if (p >= 1) {
+        rotX = settling.tx;
+        rotY = settling.ty;
+        render();
+        faceNow = settling.face;
+        settleDone();
+        settling = null;
+        return;                          // 循环终止
+      }
+      rafId = requestAnimationFrame(loop);
+      return;
+    }
+
+    /* --- 投掷：随机扰动角速度 --- */
+    velX = pushVel(velX + (Math.random() - 0.5) * 7 * k);
+    velY = pushVel(velY + (Math.random() - 0.5) * 7 * k);
+
+    rotX += velX * k;
+    rotY += velY * k;
+    render();
+
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function showLive() {
+    resultEl.className = "result live";
+    resultEl.textContent = "投掷中…";
+  }
+
+  function settleDone() {
+    rolling = false;
+    rafId = null;
+    resultEl.className = "result";
+    resultEl.innerHTML = "结果 · <span class=\"num\">" + faceNow + "</span>";
+    startBtn.disabled = false;
+    pauseBtn.disabled = true;
+    startBtn.textContent = "再 来 一 次";
+    shadow.style.opacity = "1";
+    shadow.style.transform = "translateX(-50%) scaleX(1)";
+  }
+
+  /* ---------- 开始 ---------- */
+  function start() {
+    if (rolling) return;          // 已经在转
+    settling = null;
+    rolling  = true;
+    lastT    = 0;
+    velX     = randVel();
+    velY     = randVel();
+
+    startBtn.disabled = true;
+    pauseBtn.disabled = false;
+    shadow.style.opacity = ".5";
+    shadow.style.transform = "translateX(-50%) scaleX(.7)";
+    showLive();
+
+    if (!rafId) rafId = requestAnimationFrame(loop);
+  }
+
+  /* ---------- 暂停（减速后定格在随机点数） ---------- */
+  function pause() {
+    if (!rolling || settling) return;
+
+    rolling  = false;
+    pauseBtn.disabled = true;
+
+    var face = Math.floor(Math.random() * 6) + 1;
+    var base = FACE_ROT[face];
+
+    // 取“不小于当前角度”的同姿态等价角，保证继续朝原方向转再落定
+    var tx = base[0] + 360 * Math.ceil((rotX - base[0]) / 360);
+    var ty = base[1] + 360 * Math.ceil((rotY - base[1]) / 360);
+
+    // 至少再多转小半圈，避免突然刹停
+    if (tx - rotX < 150) tx += 360;
+    if (ty - rotY < 150) ty += 360;
+
+    settling = {
+      fx: rotX, fy: rotY,
+      tx: tx,   ty: ty,
+      face: face,
+      start: performance.now()
+    };
+
+    // 循环可能已经停止，需要重新拉起
+    lastT = 0;
+    if (!rafId) rafId = requestAnimationFrame(loop);
+  }
+
+  /* ---------- 事件绑定 ---------- */
+  startBtn.addEventListener("click", start);
+  pauseBtn.addEventListener("click", pause);
+
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "Space" || e.key === " ") {
+      e.preventDefault();
+      if (rolling) pause();
+      else if (!startBtn.disabled) start();
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
