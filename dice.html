@@ -3,307 +3,613 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>骰子 · Random Dice</title>
+<title>骰子 · Dice</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  :root {
-    --face-bg-1: #ffffff;
-    --face-bg-2: #e8ecf5;
-    --pip: #1c2230;
-    --pip-red: #e2384b;
-    --accent: #4d8dff;
-  }
+  html, body { height: 100%; }
 
   body {
-    min-height: 100vh;
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    background: #f7ecc4;
+    color: #3a3115;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* 整屏画布：背景渐变、台面、骰子全部由它渲染 */
+  #gl {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    z-index: 0;
+  }
+
+  .title {
+    position: fixed;
+    left: 0; right: 0; top: 0;
+    padding-top: max(20px, 3.4vh);
+    text-align: center;
+    font-size: 13px;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: #c0aa6b;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .ui {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    padding-bottom: max(26px, 4.4vh);
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 28px;
-    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
-    background: radial-gradient(circle at 50% 15%, #2b3550 0%, #151a26 45%, #0b0e14 100%);
-    color: #e9edf6;
-    user-select: none;
-    overflow: hidden;
+    gap: 20px;
+    z-index: 2;
   }
 
-  /* 顶部标题 */
-  .title {
-    font-size: 15px;
-    letter-spacing: 6px;
-    text-transform: uppercase;
-    color: #7c88a3;
-    font-weight: 500;
-  }
-
-  /* 3D 场景 */
-  .scene {
-    width: 180px;
-    height: 180px;
-    perspective: 1100px;
-    position: relative;
-  }
-
-  /* 阴影 */
-  .shadow {
-    position: absolute;
-    left: 50%;
-    bottom: -46px;
-    width: 150px;
-    height: 22px;
-    transform: translateX(-50%);
-    background: radial-gradient(ellipse at center, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 72%);
-    filter: blur(3px);
-    transition: opacity .3s, transform .3s;
-  }
-
-  /* 整体姿态倾斜，让立方体有立体感 */
-  .tilt {
-    width: 100%;
-    height: 100%;
-    transform-style: preserve-3d;
-    transform: rotateX(-12deg) rotateY(-18deg);
-  }
-
-  .cube {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    transform-style: preserve-3d;
-    will-change: transform;
-  }
-
-  .face {
-    position: absolute;
-    inset: 0;
-    border-radius: 20px;
-    background: linear-gradient(150deg, var(--face-bg-1) 0%, var(--face-bg-2) 100%);
-    box-shadow: inset 0 0 0 2px rgba(255,255,255,.85),
-                inset 0 -14px 26px rgba(120,135,165,.28),
-                inset 0 12px 22px rgba(255,255,255,.9);
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(3, 1fr);
-    padding: 18px;
-    gap: 4px;
-    backface-visibility: hidden;
-  }
-
-  .pip {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background: radial-gradient(circle at 32% 28%, #4a5568 0%, var(--pip) 62%, #0c1018 100%);
-    box-shadow: inset 0 2px 3px rgba(0,0,0,.55), 0 1px 1px rgba(255,255,255,.65);
-    transform: scale(0);
-    transition: transform .18s ease;
-  }
-  .pip.on { transform: scale(1); }
-  .face[data-num="1"] .pip.on {
-    background: radial-gradient(circle at 32% 28%, #ff7b86 0%, var(--pip-red) 62%, #8e1424 100%);
-  }
-
-  /* 六个面 */
-  .f-front  { transform: translateZ(90px); }
-  .f-back   { transform: rotateY(180deg) translateZ(90px); }
-  .f-right  { transform: rotateY(90deg)  translateZ(90px); }
-  .f-left   { transform: rotateY(-90deg) translateZ(90px); }
-  .f-top    { transform: rotateX(90deg)  translateZ(90px); }
-  .f-bottom { transform: rotateX(-90deg) translateZ(90px); }
-
-  /* 结果文字 */
   .result {
-    font-size: 17px;
-    color: #9aa6bf;
+    min-width: 152px;
+    text-align: center;
+    padding: 9px 26px;
+    border-radius: 999px;
+    font-size: 14px;
     letter-spacing: 1px;
-    height: 24px;
+    color: #9c8c5c;
+    background: rgba(255,255,255,.66);
+    border: 1px solid rgba(200,182,130,.5);
+    box-shadow: 0 6px 18px rgba(180,160,100,.16), inset 0 1px 0 #fff;
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
     transition: color .25s;
   }
   .result .num {
-    display: inline-block;
-    min-width: 28px;
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 700;
-    color: #fff;
-    vertical-align: -3px;
+    color: #2b2310;
+    margin-left: 5px;
+    vertical-align: -2px;
   }
-  .result.live { color: #6f7d99; }
 
-  /* 按钮组 */
   .controls { display: flex; gap: 18px; }
 
   button {
-    position: relative;
-    min-width: 118px;
-    padding: 13px 26px;
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: 2px;
+    min-width: 120px;
+    padding: 13px 28px;
     font-family: inherit;
-    color: #dbe4f5;
-    background: rgba(255,255,255,.06);
-    border: 1px solid rgba(255,255,255,.14);
-    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    border-radius: 13px;
     cursor: pointer;
-    backdrop-filter: blur(6px);
-    transition: transform .12s ease, background .2s, border-color .2s, box-shadow .2s, color .2s;
+    transition: transform .12s ease, box-shadow .22s, opacity .22s, filter .22s;
   }
-  button:hover:not(:disabled) {
-    background: rgba(255,255,255,.12);
-    border-color: rgba(255,255,255,.28);
-    transform: translateY(-2px);
-  }
-  button:active:not(:disabled) { transform: translateY(0) scale(.97); }
 
   #startBtn {
-    background: linear-gradient(135deg, rgba(77,141,255,.28), rgba(77,141,255,.10));
-    border-color: rgba(77,141,255,.55);
-    color: #b9d2ff;
-    box-shadow: 0 0 0 rgba(77,141,255,0);
+    color: #6b4a05;
+    background: linear-gradient(160deg, #ffdb7a 0%, #f4b730 100%);
+    border: 1px solid #e2a81c;
+    box-shadow: 0 7px 18px rgba(206,156,25,.38), inset 0 1px 0 rgba(255,255,255,.75);
   }
   #startBtn:hover:not(:disabled) {
-    box-shadow: 0 8px 24px rgba(77,141,255,.28), 0 0 0 1px rgba(77,141,255,.35);
+    transform: translateY(-2px);
+    box-shadow: 0 11px 24px rgba(206,156,25,.46), inset 0 1px 0 rgba(255,255,255,.85);
   }
 
   #pauseBtn {
-    background: linear-gradient(135deg, rgba(255,138,76,.24), rgba(255,138,76,.08));
-    border-color: rgba(255,138,76,.5);
-    color: #ffc8a5;
+    color: #6d6450;
+    background: linear-gradient(160deg, #ffffff 0%, #f3efe4 100%);
+    border: 1px solid #cec6ad;
+    box-shadow: 0 7px 18px rgba(150,140,110,.22), inset 0 1px 0 #fff;
   }
   #pauseBtn:hover:not(:disabled) {
-    box-shadow: 0 8px 24px rgba(255,138,76,.24), 0 0 0 1px rgba(255,138,76,.32);
+    transform: translateY(-2px);
+    box-shadow: 0 11px 22px rgba(150,140,110,.3), inset 0 1px 0 #fff;
   }
+
+  button:active:not(:disabled) { transform: translateY(0) scale(.97); }
 
   button:disabled {
-    opacity: .32;
+    opacity: .42;
     cursor: not-allowed;
-    filter: grayscale(.55);
+    filter: grayscale(.6);
+    box-shadow: none;
+    transform: none;
   }
 
-  .hint { font-size: 12px; color: #566078; letter-spacing: 1px; }
+  .fallback {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.9;
+    color: #7a6a3c;
+    background: #fdf6dd;
+    z-index: 5;
+  }
+  .fallback code {
+    display: block;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #a0522d;
+    word-break: break-all;
+    white-space: pre-wrap;
+    max-height: 40vh;
+    overflow: auto;
+  }
 
   @media (max-height: 620px) {
-    .scene { width: 140px; height: 140px; }
-    .f-front,.f-back,.f-right,.f-left,.f-top,.f-bottom { transform-origin: center; }
-    .f-front  { transform: translateZ(70px); }
-    .f-back   { transform: rotateY(180deg) translateZ(70px); }
-    .f-right  { transform: rotateY(90deg)  translateZ(70px); }
-    .f-left   { transform: rotateY(-90deg) translateZ(70px); }
-    .f-top    { transform: rotateX(90deg)  translateZ(70px); }
-    .f-bottom { transform: rotateX(-90deg) translateZ(70px); }
+    .ui { gap: 14px; padding-bottom: 18px; }
+    button { padding: 10px 22px; font-size: 14px; }
   }
 </style>
 </head>
 <body>
 
-  <div class="title">Dice Roller</div>
+<canvas id="gl"></canvas>
 
-  <div class="scene">
-    <div class="tilt">
-      <div class="cube" id="cube">
-        <div class="face f-front"  data-num="1"></div>
-        <div class="face f-back"   data-num="2"></div>
-        <div class="face f-right"  data-num="3"></div>
-        <div class="face f-left"   data-num="4"></div>
-        <div class="face f-top"    data-num="5"></div>
-        <div class="face f-bottom" data-num="6"></div>
-      </div>
-    </div>
-    <div class="shadow" id="shadow"></div>
-  </div>
+<div class="title">Dice</div>
 
-  <div class="result" id="result">点击「开始」投掷骰子</div>
-
+<div class="ui">
+  <div class="result" id="result">等待投掷</div>
   <div class="controls">
     <button id="startBtn">开 始</button>
     <button id="pauseBtn" disabled>暂 停</button>
   </div>
+</div>
 
-  <div class="hint">空格键 = 开始 / 暂停</div>
+<div class="fallback" id="fallback">
+  <div>
+    这个页面需要 WebGL 才能渲染立体骰子。<br>
+    请用较新版本的 Chrome / Edge / Firefox / Safari 打开，并确认未禁用硬件加速。
+    <code id="fbErr"></code>
+  </div>
+</div>
 
 <script>
 (function () {
   "use strict";
 
-  /* ---------- 骰子点位布局 ---------- */
-  var PIP_MAP = {
-    1: [5],
-    2: [1, 9],
-    3: [1, 5, 9],
-    4: [1, 3, 7, 9],
-    5: [1, 3, 5, 7, 9],
-    6: [1, 3, 4, 6, 7, 9]
+  /* =========================================================
+     1. 几何常量（骰子是一颗"圆角立方体"，点坑由球体布尔减削出来）
+     ========================================================= */
+  var HB  = 0.70;                     // 平面半宽（面到圆角起点）
+  var RAD = 0.30;                     // 棱/角圆角半径
+  var HH  = HB + RAD;                 // 面到骰子中心距离 = 1.0
+  var PIP_R = 0.24;                   // 点坑所用球体的半径
+  var PIP_D = 0.058;                  // 点坑深度
+  var PIP_S = 0.45;                   // 九宫格点距
+  var SMK   = 0.032;                  // 坑口圆滑过渡（避免刀口）
+  var PIP_MOUTH = Math.sqrt(PIP_R * PIP_R - (PIP_R - PIP_D) * (PIP_R - PIP_D));
+
+  var G9  = [[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[0,1],[1,1]];
+  /* 各面点数：保证相对两面之和恒为 7（1-6、2-5、3-4） */
+  var PAT = {
+    1: [4],                  //  1
+    2: [0,3,6,2,5,8],        //  6  （与 1 相对）
+    3: [0,4,8],              //  3
+    4: [0,2,6,8],            //  4  （与 3 相对）
+    5: [0,2,4,6,8],          //  5
+    6: [0,8]                 //  2  （与 5 相对）
+  };
+  /* PAT 的逆表：点数 -> 画着这个点数的那一面。
+     注意"面号"和"这个面画了几点"是两回事（面 6 画的是 2 点），
+     随机抽的是点数，必须先经 FACE_OF 换算成面号再用，否则会出现"顶面 2 点、结果写 6"的错位 */
+  var FACE_OF = {};
+  [1,2,3,4,5,6].forEach(function (f) { FACE_OF[PAT[f].length] = f; });
+  var FACE_NORMAL = {
+    1: [0,0,1], 2: [0,0,-1], 3: [1,0,0], 4: [-1,0,0], 5: [0,-1,0], 6: [0,1,0]
+  };
+  /* 让某个点数朝上所需的角度（由 Rx(a)·Ry(b)·n = (0,-1,0) 解出，y 轴向下） */
+  var FACE_ROT_UP = {
+    1: [90, 0], 2: [-90, 0], 3: [-90, 90], 4: [90, 90], 5: [0, 0], 6: [180, 0]
   };
 
-  // 每个面填充圆点
-  document.querySelectorAll(".face").forEach(function (face) {
-    var n = Number(face.dataset.num);
-    for (var i = 1; i <= 9; i++) {
-      var pip = document.createElement("span");
-      pip.className = "pip" + (PIP_MAP[n].indexOf(i) > -1 ? " on" : "");
-      face.appendChild(pip);
-    }
+  function add(a, b) { return [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; }
+  function sub(a, b) { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
+  function mul(a, s) { return [a[0]*s, a[1]*s, a[2]*s]; }
+  function dot(a, b) { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
+  function vlen(a)   { return Math.sqrt(dot(a, a)); }
+  function norm(a)   { var l = vlen(a) || 1; return [a[0]/l, a[1]/l, a[2]/l]; }
+  function cross(a, b) {
+    return [a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]];
+  }
+
+  /* 生成 21 个点坑：每个记录球心、所在面的法线、是否是红点（1 点红） */
+  var PIPS = [];
+  [1,2,3,4,5,6].forEach(function (num) {
+    var n = FACE_NORMAL[num];
+    var u = Math.abs(dot(n, [0,-1,0])) > 0.9 ? [1,0,0] : norm(cross([0,-1,0], n));
+    var v = cross(n, u);
+    PAT[num].forEach(function (idx) {
+      var g = G9[idx];
+      var c = add(add(mul(n, HH + PIP_R - PIP_D), mul(u, g[0] * PIP_S)), mul(v, g[1] * PIP_S));
+      PIPS.push({ c: c, n: n, red: num === 1 ? 1 : 0 });
+    });
   });
 
-  /* ---------- 元素引用 ---------- */
-  var cube     = document.getElementById("cube");
-  var shadow   = document.getElementById("shadow");
+  /* =========================================================
+     2. 光照 / 材质常量（线性空间，最后统一转 sRGB）
+     ========================================================= */
+  var CAM = norm([0.34, -0.50, 0.80]);   // 相机方向（y 向下）
+  var CAM_DIST  = 6.2;
+  var TARGET_Y0 = 0.12;                  // 取景中心常态高度
+  var FOLLOW    = 0.72;                  // 骰子翻滚抬升时相机跟随量
+  var VIS_MIN   = 3.6;                   // 可视高度下限（保证翻滚时不顶出画面）
+  var VIS_MAX   = 6.0;
+  var VIEW_SCALE = 2.0;                  // 拉远倍率：1.0=原大小，2.0=骰子缩小到一半（只改这一个数即可缩放）
+  var FLOOR_Y   = 1.0;                   // 台面高度（骰子最低点正好落在这里）
+
+  var KEY  = norm([-0.34, -0.86, 0.38]); // 主光：偏向光源的方向
+  var FILL = norm([ 0.62, -0.24, -0.40]); // 补光
+  var COLOR = {
+    body: [0.98, 0.975, 0.955],
+    dark: [0.10, 0.10, 0.11],
+    red:  [0.74, 0.13, 0.19],
+    sky:  [1.00, 0.99, 0.95],
+    gnd:  [0.96, 0.87, 0.60],
+    floor:[0.940, 0.876, 0.672]
+  };
+
+  var f = function (x) { return Number(x).toFixed(6); };
+  var v3 = function (a) { return "vec3(" + f(a[0]) + ", " + f(a[1]) + ", " + f(a[2]) + ")"; };
+  var lin2 = function (c) { return Math.pow(c, 2.2); };
+  var v3lin = function (a) { return v3([lin2(a[0]), lin2(a[1]), lin2(a[2])]); };
+
+  /* =========================================================
+     3. 着色器
+     GLSL ES 1.0 不支持数组常量，所以 21 个点坑直接展开成语句
+     ========================================================= */
+  var pipDist = PIPS.map(function (p) {
+    return "  d = smaxk(d, -(length(p - " + v3(p.c) + ") - " + f(PIP_R) + "), " + f(SMK) + ");";
+  }).join("\n");
+
+  var pipMask = PIPS.map(function (p) {
+    var n = v3(p.n);
+    return "    { vec3 dd = lp - " + v3(p.c) + "; vec3 nn = " + n + ";" +
+           " float ax = dot(dd, nn); float l2 = dot(dd, dd) - ax * ax;" +
+           " float dep = " + f(HH) + " - dot(lp, nn);" +
+           /* 判据三件套：在坑口范围内 + 凹于面平面 + 与点坑同侧（否则会涂到对面同名位置） */
+           " if (l2 < 0.062 && dep > 0.0 && dot(lp, nn) > 0.0) {" +
+           " float tt = min(1.0, dep / 0.006) * clamp((" + f(PIP_MOUTH + 0.012) +
+           " - sqrt(l2)) / 0.012, 0.0, 1.0);" +
+           " if (tt > m) { m = tt; isRed = " + f(p.red) + "; } } }";
+  }).join("\n");
+
+  var FS_SRC = [
+    "precision highp float;",
+    "uniform vec2  uRes;",
+    "uniform vec3  uEye;",
+    "uniform vec3  uFwd;",
+    "uniform vec3  uRight;",
+    "uniform vec3  uUp;",
+    "uniform float uTanH;",
+    "uniform float uAspect;",
+    "uniform mat3  uRotT;",
+    "uniform vec3  uCenter;",
+    "const float HB = " + f(HB) + ";",
+    "const float RAD = " + f(RAD) + ";",
+    "const float HH = " + f(HH) + ";",
+    "const float PR = " + f(PIP_R) + ";",
+    "const float SMK = " + f(SMK) + ";",
+    "const float FLOOR_Y = " + f(FLOOR_Y) + ";",
+    "const vec3 KEYL = " + v3(KEY) + ";",
+    "const vec3 FILL = " + v3(FILL) + ";",
+    "const vec3 ALB_BODY = " + v3lin(COLOR.body) + ";",
+    "const vec3 ALB_DARK = " + v3lin(COLOR.dark) + ";",
+    "const vec3 ALB_RED  = " + v3lin(COLOR.red) + ";",
+    "const vec3 SKY = " + v3lin(COLOR.sky) + ";",
+    "const vec3 GND = " + v3lin(COLOR.gnd) + ";",
+    "const vec3 FLOOR_C = " + v3lin(COLOR.floor) + ";",
+    "",
+    "float hash21(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }",
+    "float sdRoundBox(vec3 p){ vec3 q = abs(p) - HB; return length(max(q, 0.0)) - RAD; }",
+    "float smaxk(float a, float b, float k){",
+    "  float h = max(k - abs(a - b), 0.0) / k;",
+    "  return max(a, b) + h * h * k * 0.25;",
+    "}",
+    "float mapLocal(vec3 p){",
+    "  float d = sdRoundBox(p);",
+    "  if (d > 0.40) return d;",
+    pipDist,
+    "  return d;",
+    "}",
+    "float mapWorld(vec3 p){ return mapLocal(uRotT * (p - uCenter)); }",
+    "vec3 calcNormal(vec3 p){",
+    "  float e = 0.0018;",
+    "  float dx = mapWorld(p + vec3(e, 0.0, 0.0)) - mapWorld(p - vec3(e, 0.0, 0.0));",
+    "  float dy = mapWorld(p + vec3(0.0, e, 0.0)) - mapWorld(p - vec3(0.0, e, 0.0));",
+    "  float dz = mapWorld(p + vec3(0.0, 0.0, e)) - mapWorld(p - vec3(0.0, 0.0, e));",
+    "  return normalize(vec3(dx, dy, dz));",
+    "}",
+    "float calcAO(vec3 p, vec3 n){",
+    "  float occ = 0.0; float sca = 1.0;",
+    "  for (int i = 1; i <= 5; i++){",
+    "    float h = 0.016 * float(i);",
+    "    occ += (h - mapWorld(p + n * h)) * sca;",
+    "    sca *= 0.72;",
+    "  }",
+    "  return clamp(1.0 - 1.9 * occ, 0.0, 1.0);",
+    "}",
+    "float softShadow(vec3 p){",
+    "  float res = 1.0; float t = 0.035;",
+    "  for (int i = 0; i < 26; i++){",
+    "    float h = mapWorld(p + KEYL * t);",
+    "    if (h < 0.0016) return 0.0;",
+    "    res = min(res, 9.0 * h / t);",
+    "    t += max(0.028, min(h, 0.30));",
+    "    if (t > 4.5) break;",
+    "  }",
+    "  return max(0.0, res);",
+    "}",
+    "vec3 envColor(vec3 d){",
+    "  float t = d.y * 0.5 + 0.5;",
+    "  return mix(SKY, GND, t);",
+    "}",
+    "vec3 acesT(vec3 x){ return (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14); }",
+    "",
+    "void main(){",
+    "  vec2 uv = gl_FragCoord.xy / uRes;",
+    "  float sx = (uv.x * 2.0 - 1.0) * uTanH * uAspect;",
+    "  float sy = (uv.y * 2.0 - 1.0) * uTanH;",
+    "  vec3 rd = normalize(uFwd + uRight * sx + uUp * sy);",
+    "  vec3 ro = uEye;",
+    "",
+    "  float t = 0.05;",
+    "  bool hit = false;",
+    "  for (int i = 0; i < 150; i++){",
+    "    float d = mapWorld(ro + rd * t);",
+    "    if (d < 0.0012) { hit = true; break; }",
+    "    t += d;",
+    "    if (t > 14.0) break;",
+    "  }",
+    "  float tFloor = 9999.0;",
+    "  if (rd.y > 0.0001){",
+    "    float tf = (FLOOR_Y - ro.y) / rd.y;",
+    "    if (tf > 0.3) tFloor = tf;",
+    "  }",
+    "",
+    "  vec3 col;",
+    "  if (hit && t < tFloor){",
+    "    vec3 p = ro + rd * t;",
+    "    vec3 n = calcNormal(p);",
+    "    vec3 v = -rd;",
+    "    vec3 lp = uRotT * (p - uCenter);",
+    "    float m = 0.0; float isRed = 0.0;",
+    pipMask,
+    "    vec3 paint = mix(ALB_DARK, ALB_RED, isRed);",
+    "    vec3 alb = mix(ALB_BODY, paint, m);",
+    "    float sh = softShadow(p);",
+    "    float ao = calcAO(p, n);",
+    "    float dif  = max(0.0, dot(n, KEYL)) * 0.95 * sh;",
+    "    float dif2 = max(0.0, dot(n, FILL)) * 0.26 * (0.45 + 0.55 * sh);",
+    "    float amb  = (0.15 + 0.32 * (n.y * -0.5 + 0.5)) * (0.45 + 0.55 * ao);",
+    "    vec3 hv = normalize(KEYL + v);",
+    "    float spec  = pow(max(0.0, dot(n, hv)), 110.0) * 1.0 * sh;",
+    "    float sheen = pow(max(0.0, dot(n, hv)), 16.0) * 0.09 * sh;",
+    "    float fres  = pow(1.0 - max(0.0, dot(n, v)), 5.0) * 0.38;",
+    "    vec3 refl = n - v * 2.0 * dot(n, v);",
+    "    vec3 env = envColor(refl);",
+    "    vec3 cont = alb * (dif + dif2 + amb) * (0.35 + 0.65 * pow(ao, 0.7));",
+    "    vec3 gloss = vec3(spec + sheen) * (0.9 - 0.85 * m) + env * (fres * 0.45) + env * (0.05 * (1.0 - m));",
+    "    col = acesT((cont + gloss) * 1.18);",
+    "  } else if (tFloor < 9000.0){",
+    "    vec3 p = ro + rd * tFloor;",
+    "    vec3 n = vec3(0.0, -1.0, 0.0);",
+    "    float sh = softShadow(p) * 0.94;",
+    "    float dif = max(0.0, dot(n, KEYL)) * sh;",
+    "    float gt = clamp((p.z + 2.2) / 5.4, 0.0, 1.0);",
+    "    float dist = length(p - ro);",
+    "    float fade = clamp((dist - 5.0) / 9.0, 0.0, 1.0);",
+    "    vec3 c = FLOOR_C * (dif * 0.85 + 0.72) * (0.92 + 0.10 * gt) + envColor(vec3(0.0, -1.0, 0.0)) * 0.05;",
+    "    col = mix(c, envColor(normalize(p - ro)), fade);",
+    "  } else {",
+    "    col = envColor(rd);",
+    "  }",
+    "",
+    "  float vig = 1.0 - 0.30 * min(1.0, (sx * sx + sy * sy) / (uTanH * uTanH * (uAspect * uAspect + 1.0)));",
+    "  col = pow(max(col * vig, 0.0), vec3(0.45454545));",
+    "  col += (hash21(gl_FragCoord.xy) - 0.5) / 255.0;",
+    "  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);",
+    "}"
+  ].join("\n");
+
+  var VS_SRC = [
+    "attribute vec2 aPos;",
+    "void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }"
+  ].join("\n");
+
+  /* =========================================================
+     4. WebGL 初始化
+     ========================================================= */
+  var canvas = document.getElementById("gl");
+  var fallback = document.getElementById("fallback");
+  var fbErr = document.getElementById("fbErr");
+
+  function fail(msg) {
+    fallback.style.display = "flex";
+    fbErr.textContent = msg || "";
+  }
+
+  var gl = null;
+  try {
+    gl = canvas.getContext("webgl", { antialias: false, alpha: false, depth: false,
+                                      stencil: false, powerPreference: "high-performance" })
+      || canvas.getContext("experimental-webgl", { antialias: false, alpha: false });
+  } catch (e) {
+    fail(e && e.message);
+    return;
+  }
+  if (!gl) { fail(); return; }
+
+  function compile(type, src) {
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      throw new Error(gl.getShaderInfoLog(s) || "着色器编译失败");
+    }
+    return s;
+  }
+
+  var prog;
+  try {
+    prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS_SRC));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS_SRC));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      throw new Error(gl.getProgramInfoLog(prog) || "着色器链接失败");
+    }
+  } catch (e) {
+    fail(e.message);
+    return;
+  }
+  gl.useProgram(prog);
+
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  var aPos = gl.getAttribLocation(prog, "aPos");
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  var U = {};
+  ["uRes","uEye","uFwd","uRight","uUp","uTanH","uAspect","uRotT","uCenter"].forEach(function (k) {
+    U[k] = gl.getUniformLocation(prog, k);
+  });
+
+  /* =========================================================
+     5. 姿态与动画
+     ========================================================= */
+  var DEG = Math.PI / 180;
+  var B_MAT = HB, R_MAT = RAD;
+
+  function rotM(ax, ay) {
+    var a = ax * DEG, b = ay * DEG;
+    var ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+    var Ry = [[cb,0,sb],[0,1,0],[-sb,0,cb]];
+    var Rx = [[1,0,0],[0,ca,-sa],[0,sa,ca]];
+    var M = [[0,0,0],[0,0,0],[0,0,0]];
+    for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++) {
+      var s = 0;
+      for (var k = 0; k < 3; k++) s += Rx[i][k] * Ry[k][j];
+      M[i][j] = s;
+    }
+    return M;
+  }
+  function mTv(M, p) {
+    return [M[0][0]*p[0] + M[1][0]*p[1] + M[2][0]*p[2],
+            M[0][1]*p[0] + M[1][1]*p[1] + M[2][1]*p[2],
+            M[0][2]*p[0] + M[1][2]*p[1] + M[2][2]*p[2]];
+  }
+
+  var SPIN_MAX = 26, SPIN_MIN = 9;
+  var rotX = 90, rotY = 0;      // 初始姿态：1 点朝上
+  var velX = 0, velY = 0;
+  var rolling = false, settling = null, rafId = null, lastT = 0, faceNow = 1;
+
   var resultEl = document.getElementById("result");
   var startBtn = document.getElementById("startBtn");
   var pauseBtn = document.getElementById("pauseBtn");
 
-  /* ---------- 姿态与物理参数 ---------- */
-  // 使某个点数朝向观察者所需的 rotateX / rotateY（单位：度）
-  var FACE_ROT = {
-    1: [0, 0],
-    2: [0, 180],
-    3: [0, -90],
-    4: [0, 90],
-    5: [-90, 0],
-    6: [90, 0]
-  };
+  /* 自适应分辨率：按帧耗时升降，保证低端机也能流畅 */
+  var resScale = Math.min(window.devicePixelRatio || 1, 1.6);
+  var scaleMax = resScale;
+  var frameAcc = 0, frameN = 0, lastAdjust = 0;
 
-  var SPIN_MAX   = 26;   // 最大角速度（度 / 帧@60fps）
-  var SPIN_MIN   = 9;    // 最小角速度，保证一直在转
-  var SETTLE_MS  = 950;  // 停下来的减速时长
+  function resize(force) {
+    var w = canvas.clientWidth  || window.innerWidth;
+    var h = canvas.clientHeight || window.innerHeight;
+    var W = Math.max(240, Math.round(w * resScale));
+    var H = Math.max(180, Math.round(h * resScale));
+    if (force || canvas.width !== W || canvas.height !== H) {
+      canvas.width = W;
+      canvas.height = H;
+      gl.viewport(0, 0, W, H);
+      return true;
+    }
+    return false;
+  }
 
-  var rotX = 0, rotY = 0;      // 当前角度
-  var velX = 0, velY = 0;      // 当前角速度
-  var rolling   = false;       // 是否处于投掷状态
-  var settling  = null;        // 收尾动画状态
-  var rafId     = null;
-  var lastT     = 0;
-  var faceNow   = 1;           // 当前正面点数
-
+  /* 最低点落在台面上 -> 骰子随翻滚自然起伏；相机再轻微跟随 */
   function render() {
-    cube.style.transform = "rotateX(" + rotX.toFixed(2) + "deg) rotateY(" + rotY.toFixed(2) + "deg)";
+    var M = rotM(rotX, rotY);
+    var downLocal = mTv(M, [0, 1, 0]);
+    var hLow = B_MAT * (Math.abs(downLocal[0]) + Math.abs(downLocal[1]) + Math.abs(downLocal[2])) + R_MAT;
+    var center = [0, FLOOR_Y - hLow, 0];
+
+    var vw = canvas.clientWidth || window.innerWidth;
+    var vh = canvas.clientHeight || window.innerHeight;
+    var aspect = vw / vh;
+    var vis = Math.max(VIS_MIN, Math.min(VIS_MAX, vh / 235));
+    vis = Math.max(vis, 2.9 / aspect);
+    vis *= VIEW_SCALE;                   // 整体拉远（同一倍率同时作用于下限与宽度约束，构图比例不变）
+    var tanH = vis / (2 * CAM_DIST);
+
+    var target = [0, TARGET_Y0 - FOLLOW * (hLow - 1), 0];
+    var eye = add(target, mul(CAM, CAM_DIST));
+    var fwd = norm(sub(target, eye));
+    var right = norm(cross(fwd, [0, -1, 0]));
+    var up = cross(right, fwd);
+
+    gl.uniform2f(U.uRes, canvas.width, canvas.height);
+    gl.uniform3f(U.uEye, eye[0], eye[1], eye[2]);
+    gl.uniform3f(U.uFwd, fwd[0], fwd[1], fwd[2]);
+    gl.uniform3f(U.uRight, right[0], right[1], right[2]);
+    gl.uniform3f(U.uUp, up[0], up[1], up[2]);
+    gl.uniform1f(U.uTanH, tanH);
+    gl.uniform1f(U.uAspect, aspect);
+    gl.uniform3f(U.uCenter, center[0], center[1], center[2]);
+    /* 行优先数组直接当列优先传入，正好等于原矩阵；这就是"世界 -> 局部" */
+    gl.uniformMatrix3fv(U.uRotT, false, new Float32Array([
+      M[0][0], M[0][1], M[0][2],
+      M[1][0], M[1][1], M[1][2],
+      M[2][0], M[2][1], M[2][2]
+    ]));
+
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
   function randVel() {
     var s = SPIN_MIN + Math.random() * (SPIN_MAX - SPIN_MIN);
-    var sign = Math.random() < 0.5 ? -1 : 1;
-    return s * sign;
+    return Math.random() < 0.5 ? -s : s;
   }
-
   function pushVel(v) {
-    // 维持一个方向，但保证速度不低于下限
     if (Math.abs(v) < SPIN_MIN) return (v < 0 ? -1 : 1) * SPIN_MIN;
     return Math.max(-SPIN_MAX, Math.min(SPIN_MAX, v));
   }
+  /* 落点角度：落在 base + 360k 上，保持原转向，且至少多转 flips 整圈 */
+  function alignTarget(cur, base, flips, sign) {
+    var t;
+    if (sign >= 0) {
+      t = base + 360 * Math.ceil((cur - base) / 360);
+      if (t < cur) t += 360;
+      return t + 360 * flips;
+    }
+    t = base + 360 * Math.floor((cur - base) / 360);
+    if (t > cur) t -= 360;
+    return t - 360 * flips;
+  }
 
-  /* ---------- 主循环 ---------- */
   function loop(t) {
     if (!lastT) lastT = t;
-    var dt = Math.min(48, t - lastT);   // 限幅，防止切标签后跳帧
+    var dt = Math.min(48, t - lastT);
     lastT = t;
-    var k = dt / 16.667;                // 相对 60fps 的步长系数
+    var k = dt / 16.667;
 
-    /* --- 收尾：缓出落到某个点数 --- */
     if (settling) {
-      var p = Math.min(1, (t - settling.start) / SETTLE_MS);
-      var e = 1 - Math.pow(1 - p, 3);   // easeOutCubic
+      /* 匀减速落定（等价恒定摩擦）：θ(p) = 1-(1-p)² */
+      var p = Math.min(1, (t - settling.start) / settling.dur);
+      var e = 1 - Math.pow(1 - p, 2);
       rotX = settling.fx + (settling.tx - settling.fx) * e;
       rotY = settling.fy + (settling.ty - settling.fy) * e;
       render();
@@ -312,92 +618,117 @@
         rotX = settling.tx;
         rotY = settling.ty;
         render();
-        faceNow = settling.face;
-        settleDone();
+        faceNow = settling.num;
         settling = null;
-        return;                          // 循环终止
+        settleDone();
+        return;
       }
-      rafId = requestAnimationFrame(loop);
-      return;
+    } else {
+      velX = pushVel(velX + (Math.random() - 0.5) * 7 * k);
+      velY = pushVel(velY + (Math.random() - 0.5) * 7 * k);
+      rotX += velX * k;
+      rotY += velY * k;
+      render();
     }
 
-    /* --- 投掷：随机扰动角速度 --- */
-    velX = pushVel(velX + (Math.random() - 0.5) * 7 * k);
-    velY = pushVel(velY + (Math.random() - 0.5) * 7 * k);
-
-    rotX += velX * k;
-    rotY += velY * k;
-    render();
+    /* 帧耗时统计 + 分辨率自适应 */
+    frameAcc += dt; frameN++;
+    if (frameN >= 24) {
+      var avg = frameAcc / frameN;
+      frameAcc = 0; frameN = 0;
+      var now = t;
+      if (now - lastAdjust > 350) {
+        if (avg > 27 && resScale > 0.7) {
+          resScale = Math.max(0.7, resScale * 0.82);
+          lastAdjust = now; resize(true);
+        } else if (avg < 13 && resScale < scaleMax) {
+          resScale = Math.min(scaleMax, resScale * 1.1);
+          lastAdjust = now; resize(true);
+        }
+      }
+    }
 
     rafId = requestAnimationFrame(loop);
-  }
-
-  function showLive() {
-    resultEl.className = "result live";
-    resultEl.textContent = "投掷中…";
   }
 
   function settleDone() {
     rolling = false;
     rafId = null;
-    resultEl.className = "result";
-    resultEl.innerHTML = "结果 · <span class=\"num\">" + faceNow + "</span>";
+    resultEl.innerHTML = "结果<span class=\"num\">" + faceNow + "</span>";
     startBtn.disabled = false;
     pauseBtn.disabled = true;
     startBtn.textContent = "再 来 一 次";
-    shadow.style.opacity = "1";
-    shadow.style.transform = "translateX(-50%) scaleX(1)";
+    resetRes();
   }
 
-  /* ---------- 开始 ---------- */
+  function resetRes() {
+    frameAcc = 0; frameN = 0;
+  }
+
   function start() {
-    if (rolling) return;          // 已经在转
+    if (rolling) return;
     settling = null;
-    rolling  = true;
-    lastT    = 0;
-    velX     = randVel();
-    velY     = randVel();
+    rolling = true;
+    lastT = 0;
+    resetRes();
+    velX = randVel();
+    velY = randVel();
 
     startBtn.disabled = true;
     pauseBtn.disabled = false;
-    shadow.style.opacity = ".5";
-    shadow.style.transform = "translateX(-50%) scaleX(.7)";
-    showLive();
+    resultEl.textContent = "投掷中…";
 
     if (!rafId) rafId = requestAnimationFrame(loop);
   }
 
-  /* ---------- 暂停（减速后定格在随机点数） ---------- */
+  /* 暂停：不立刻停，匀减速再翻 1~2 圈后落定 */
   function pause() {
     if (!rolling || settling) return;
-
-    rolling  = false;
+    rolling = false;
     pauseBtn.disabled = true;
 
-    var face = Math.floor(Math.random() * 6) + 1;
-    var base = FACE_ROT[face];
+    /* 抽的是点数（1~6，也就是"顶面应该显示几点"），再换算成承载它的面号 */
+    var num  = Math.floor(Math.random() * 6) + 1;
+    var face = FACE_OF[num];
+    var base = FACE_ROT_UP[face];
 
-    // 取“不小于当前角度”的同姿态等价角，保证继续朝原方向转再落定
-    var tx = base[0] + 360 * Math.ceil((rotX - base[0]) / 360);
-    var ty = base[1] + 360 * Math.ceil((rotY - base[1]) / 360);
+    // 刹车初速度 = 暂停瞬间的合成角速度（除以 √2 归一），衔接无跳变
+    var speed = Math.sqrt(velX * velX + velY * velY) / 1.4142 / 16.667;   // 度/毫秒
+    if (speed < 0.50) speed = 0.50;
+    if (speed > 1.45) speed = 1.45;
 
-    // 至少再多转小半圈，避免突然刹停
-    if (tx - rotX < 150) tx += 360;
-    if (ty - rotY < 150) ty += 360;
+    // 绕水平轴(X)再翻整圈：真实骰子在桌面上就是绕水平轴翻滚
+    var turns = 1 + (Math.random() < 0.5 ? 0 : 1);
+    var tx = alignTarget(rotX, base[0], turns, velX);
+    var ty = alignTarget(rotY, base[1], 0, velY);
+
+    // 匀减速下 总转角 = v0·T/2  ->  T = 2·总转角 / v0
+    var dur = 2 * Math.max(Math.abs(tx - rotX), Math.abs(ty - rotY)) / speed;
+
+    // 让刹车时长落在自然区间，保证起步速度真的等于暂停那一瞬
+    if (dur < 900 && turns === 1) {
+      tx = alignTarget(rotX, base[0], 2, velX);
+      dur = 2 * Math.max(Math.abs(tx - rotX), Math.abs(ty - rotY)) / speed;
+    } else if (dur > 2500 && turns === 2) {
+      tx = alignTarget(rotX, base[0], 1, velX);
+      dur = 2 * Math.max(Math.abs(tx - rotX), Math.abs(ty - rotY)) / speed;
+    }
+    if (dur < 900)  dur = 900;
+    if (dur > 2500) dur = 2500;
 
     settling = {
       fx: rotX, fy: rotY,
       tx: tx,   ty: ty,
-      face: face,
-      start: performance.now()
+      num: num,
+      start: performance.now(),
+      dur: dur
     };
 
-    // 循环可能已经停止，需要重新拉起
+    resultEl.textContent = "投掷中…";
     lastT = 0;
     if (!rafId) rafId = requestAnimationFrame(loop);
   }
 
-  /* ---------- 事件绑定 ---------- */
   startBtn.addEventListener("click", start);
   pauseBtn.addEventListener("click", pause);
 
@@ -409,6 +740,15 @@
     }
   });
 
+  var resizeTimer = null;
+  window.addEventListener("resize", function () {
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    if (resize(true) && !rafId && !rolling) render();
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () { if (!rafId && !rolling) render(); }, 120);
+  });
+
+  resize(true);
   render();
 })();
 </script>
