@@ -4,9 +4,19 @@
 
 ## 在线访问
 
-启用 GitHub Pages 后访问：
+推荐优先使用 jsDelivr（CDN 分发，国内通常比 github.io 更容易打开）：
+
+https://cdn.jsdelivr.net/gh/sweetorange2022/random-dice@main/dice.html
+
+固定提交镜像（内容与当前 v2 相同）：
+
+https://cdn.jsdelivr.net/gh/sweetorange2022/random-dice@afc6f19/dice.html
+
+备用（GitHub Pages。github.io 在中国大陆可能被屏蔽或较慢）：
 
 https://sweetorange2022.github.io/random-dice/dice.html
+
+入口文件仍是 `dice.html`（不是 `index.html`）。
 
 ## 说明
 
